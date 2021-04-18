@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+// create interface for shesha and use it to save contract bytecode size , this will save deploy cost 
 import "./SHEESHA.sol";
 
 contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
@@ -47,7 +48,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     
     // Info of each pool.
     PoolInfo[] public poolInfo;
-    // maping( useraddress  to pid to user info )
+    // maping( useraddress  to pid to user info ) will help if we want to get user pools , pools number is less than  potential user number so iterating over it will be much easier 
     // Info of each user that stakes  tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
@@ -66,6 +67,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
 
      //user count
     uint256 public userCount;
+    // redundant we can use only one of them ,check my comments in _deposit function
     mapping(uint256 => address) public userList;
 
     mapping(address => bool) internal isExisting;
@@ -77,7 +79,9 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
+
     constructor(
+        // use address data type to reduce deployment cost
         SHEESHA _sheesha,
         uint256 _startBlock,
         uint256 _lpRewards
@@ -94,10 +98,11 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     // Add a new lp to the pool. Can only be called by the owner.
     // DO NOT add the same LP token more than once. Rewards will be messed up if you do.
     // no check for duplication here !!
-    // use external to reduce gas cost , this function is not called interal and exteranl
-    // use address data type  rather than IERC20 to save gas 
+    // use external to reduce gas cost , this function is not called internal and exteranl
+    
     function add(
         uint256 _allocPoint,
+        // use address data type  rather than IERC20 to save gas 
         IERC20 _lpToken,
         bool _withUpdate
     ) public onlyOwner {
