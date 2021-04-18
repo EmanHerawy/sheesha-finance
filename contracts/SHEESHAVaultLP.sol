@@ -13,8 +13,10 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     // Info of each user.
+    // user pool info , FOR EACH POOL  user participated in 
     struct UserInfo {
         uint256 amount; // How many LP tokens the user has provided.
+        // more explaination nneeded for rewardDebt , what is its main function? 
         uint256 rewardDebt; // Reward debt. See explanation below.
         uint256 checkpoint; //time user staked
         bool status; //true-> user existing | false-> not
@@ -33,17 +35,19 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
 
     // Info of each pool.
     struct PoolInfo {
+        // use address data type to save gas
         IERC20 lpToken; // Address of token/LP token contract.
         uint256 allocPoint; // How many allocation points assigned to this pool. SHEESHAs to distribute per block.
         uint256 lastRewardBlock; // Last block number that SHEESHAs distribution occurs.
         uint256 accSheeshaPerShare; // Accumulated SHEESHAs per share, times 1e12. See below.
     }
-
+// for gas consumption we can use data type address and interface for Sheesah rather than importing the whole contract 
     // The SHEESHA TOKEN!
     SHEESHA public sheesha;
     
     // Info of each pool.
     PoolInfo[] public poolInfo;
+    // maping( useraddress  to pid to user info )
     // Info of each user that stakes  tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
@@ -89,6 +93,9 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // DO NOT add the same LP token more than once. Rewards will be messed up if you do.
+    // no check for duplication here !!
+    // use external to reduce gas cost , this function is not called interal and exteranl
+    // use address data type  rather than IERC20 to save gas 
     function add(
         uint256 _allocPoint,
         IERC20 _lpToken,
@@ -108,7 +115,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
             })
         );
     }
-
+    // use external to reduce gas cost , this function is not called interal and exteranl 
     // Update the given pool's reward block. Can only be called by the owner.
     function setPoolLastRewardBlock(
         uint256 _pid,
@@ -116,6 +123,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     ) public onlyOwner {
         poolInfo[_pid].lastRewardBlock = _lastRewardBlock;
     }
+    // use external to reduce gas cost , this function is not called interal and exteranl 
 
     function setPoolSheeshaPerShare(
         uint256 _pid,
@@ -123,7 +131,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     ) public onlyOwner {
         poolInfo[_pid].accSheeshaPerShare = _accSheeshaPerShare;
     }
-
+    // use external to reduce gas cost , this function is not called interal and exteranl 
     // Update the given pool's SHEESHA allocation point. Can only be called by the owner.
     function set(
         uint256 _pid,
@@ -136,7 +144,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
         poolInfo[_pid].allocPoint = _allocPoint;
     }
-
+// very costly way to update 
     // Update reward vairables for all pools. Be careful of gas spending!
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
@@ -145,7 +153,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
             updatePoolRequest(pid);
         }
     }
-
+    // very costly way to update 
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
@@ -204,7 +212,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     function getMultiplier(uint256 _from, uint256 _to) public pure returns (uint256) {
         return _to.sub(_from);
     }
-
+    // very costly way to update 
     function updatePoolRequest(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         
@@ -230,10 +238,13 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
     function depositFor(address _depositFor, uint256 _pid, uint256 _amount) public {
         _deposit(_depositFor, _pid, _amount);
     }
-
+// not cost effecient 
+// the current implementaion cost user much gas and don't check for _amount value which is importnat in the function logic  
     function _deposit(address _depositFor, uint256 _pid, uint256 _amount) internal nonReentrant {
+        // adding user to many map cost a lot, prefered to make it once e.g. use userlist only or better option to use EnumerableSet check --> https://docs.openzeppelin.com/contracts/3.x/api/utils#EnumerableSet
         if(!isUserExisting(msg.sender)) {
             userList[userCount] = msg.sender;
+           // use counter libararies provided by openzipplen
             userCount++;
             isExisting[msg.sender] = true;
         }
@@ -247,7 +258,8 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
         } else {
             updatePoolBy100(_pid);
         }
-
+// why ? no function to make user inactive ? 
+// what is the differance between userInfo status and isExisting in term of fucntionality ?!
         if(!isActive(_pid, _depositFor)) {
             user.status = true;
             user.checkpoint = block.timestamp;
@@ -262,7 +274,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount); // This is depositedFor address
         }
-
+// if user.amount is zero , user.rewardDebt will be zero as well. this will happen if user by mistake sends 0 _amount,  the reansaction won't reverted but user will lose gas. require ( _amount > 0) 
         user.rewardDebt = user.amount.mul(pool.accSheeshaPerShare).div(1e12); /// This is deposited for address
         emit Deposit(_depositFor, _pid, _amount);
     }
@@ -294,6 +306,7 @@ contract SHEESHAVaultLP is Ownable, ReentrancyGuard {
             pool.lpToken.safeTransfer(feeWallet, fees);
             pool.lpToken.safeTransfer(address(msg.sender), _amount.sub(fees));
         }
+        // if user withdraw all his token, he won't get any rewards!
         user.rewardDebt = user.amount.mul(pool.accSheeshaPerShare).div(1e12);
         emit Withdraw(msg.sender, _pid, _amount);
     }
